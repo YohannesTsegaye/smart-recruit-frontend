@@ -49,12 +49,13 @@ pipeline {
         stage('🧹 3. Lint Code') {
             steps {
                 script {
-                    try {
-                        sh 'npm run lint'
-                        echo "✅ Linting passed"
-                    } catch (err) {
-                        echo "⚠️ Linting issues found"
-                        // Continue despite linting errors
+                    // Check if lint script exists
+                    def hasLintScript = sh(script: 'grep -q "\"lint\":" package.json && echo "yes" || echo "no"', returnStdout: true).trim()
+                    
+                    if (hasLintScript == "yes") {
+                        sh 'npm run lint || echo "Lint issues found"'
+                    } else {
+                        echo "ℹ️ No lint script found - skipping"
                     }
                 }
             }
@@ -63,11 +64,18 @@ pipeline {
         stage('🧪 4. Run Tests') {
             steps {
                 script {
-                    try {
-                        sh 'npm test'
-                        echo "✅ Tests passed"
-                    } catch (err) {
-                        error("❌ Tests failed - aborting pipeline")
+                    // Check if test script exists
+                    def hasTestScript = sh(script: 'grep -q "\"test\":" package.json && echo "yes" || echo "no"', returnStdout: true).trim()
+                    
+                    if (hasTestScript == "yes") {
+                        try {
+                            sh 'npm test'
+                            echo "✅ Tests passed"
+                        } catch (err) {
+                            error("❌ Tests failed - aborting pipeline")
+                        }
+                    } else {
+                        echo "ℹ️ No test script found - skipping tests"
                     }
                 }
             }
@@ -76,11 +84,16 @@ pipeline {
         stage('🏗️ 5. Build Project') {
             steps {
                 script {
-                    sh 'npm run build'
-                    echo "✅ Build completed successfully"
+                    // Check if build script exists
+                    def hasBuildScript = sh(script: 'grep -q "\"build\":" package.json && echo "yes" || echo "no"', returnStdout: true).trim()
                     
-                    // Verify build output
-                    sh 'ls -la dist/ || ls -la build/'
+                    if (hasBuildScript == "yes") {
+                        sh 'npm run build'
+                        echo "✅ Build completed successfully"
+                        sh 'ls -la dist/ || ls -la build/'
+                    } else {
+                        error("❌ No build script found - cannot continue")
+                    }
                 }
             }
         }
