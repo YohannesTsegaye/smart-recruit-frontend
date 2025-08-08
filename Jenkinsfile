@@ -20,8 +20,8 @@ pipeline {
                 ])
                 echo "✅ Repository cloned successfully"
                 
-                // Install ESLint globally if missing
-                sh 'npm list eslint || npm install -g eslint'
+                // SOLUTION 3: Verify ESLint is available
+                sh 'npx eslint --version || echo "ESLint not found locally"'
             }
         }
 
@@ -30,21 +30,9 @@ pipeline {
                 script {
                     sh 'rm -rf node_modules'
                     
-                    // Check if package-lock.json exists
-                    def lockFileExists = fileExists('package-lock.json')
-                    
-                    if (lockFileExists) {
-                        try {
-                            sh 'npm ci --omit=dev'
-                            echo "✅ Dependencies installed (ci mode)"
-                        } catch (err) {
-                            echo "⚠️ npm ci failed, falling back to npm install"
-                            sh 'npm install --omit=dev'
-                        }
-                    } else {
-                        sh 'npm install --omit=dev'
-                        echo "✅ Dependencies installed (npm install)"
-                    }
+                    // SOLUTION 1: Install ALL dependencies (including devDependencies)
+                    sh 'npm install' // Removed --omit=dev flag
+                    echo "✅ All dependencies installed (including devDependencies)"
                     
                     // Verify build script exists
                     if (!fileExists('package.json') || 
@@ -117,3 +105,4 @@ pipeline {
         }
     }
 }
+
