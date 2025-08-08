@@ -14,10 +14,10 @@ export default function Home() {
             Find Your Next Opportunity
           </h1>
           <p className="text-base sm:text-lg text-gray-600 mb-6">
-            Browse thousands of job openings from top companiesss.
+            Browse thousands of job openings from top companies.
           </p>
           <button
-            onClick={() => navigate('/Jobs')} // Changed to lowercase for consistency
+            onClick={() => navigate('/jobs')}
             className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 sm:px-6 sm:py-3 rounded-md transition-colors duration-200 font-medium"
           >
             Browse Jobs

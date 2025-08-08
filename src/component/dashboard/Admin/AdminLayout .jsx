@@ -1,11 +1,10 @@
-import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Link, Outlet, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 
 const AdminLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showStatusWarning, setShowStatusWarning] = useState(false);
   const location = useLocation();
-  const navigate = useNavigate();
 
   // Get user data from localStorage
   const getUserData = () => {
