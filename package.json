@@ -37,8 +37,13 @@
     "vite": "^6.3.1"
   },
     "scripts": {
-    "build": "your-build-command",
+    "dev": "vite",
+    "build": "vite build",
     "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "fix-unused": "node fix-unused-vars.js",
+    "preview": "vite preview",
+    "start": "vite --open",
     "test": "echo \"No tests configured\" && exit 0"
   }
 
