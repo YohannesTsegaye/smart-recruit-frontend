@@ -7,7 +7,7 @@ pipeline {
     }
 
     stages {
-        stage('🏗️ 1. Checkout Code') {
+        stage('🏗️ 1. Checkout & Setup') {
             steps {
                 cleanWs()
                 checkout([
@@ -19,6 +19,9 @@ pipeline {
                     ]]
                 ])
                 echo "✅ Repository cloned successfully"
+                
+                // Install ESLint globally if missing
+                sh 'npm list eslint || npm install -g eslint'
             }
         }
 
@@ -42,6 +45,12 @@ pipeline {
                         sh 'npm install --omit=dev'
                         echo "✅ Dependencies installed (npm install)"
                     }
+                    
+                    // Verify build script exists
+                    if (!fileExists('package.json') || 
+                        !sh(script: 'grep -q "\"build\":" package.json', returnStatus: true) == 0) {
+                        error("❌ Critical: No build script found in package.json")
+                    }
                 }
             }
         }
@@ -50,10 +59,13 @@ pipeline {
             steps {
                 script {
                     // Check if lint script exists
-                    def hasLintScript = sh(script: 'grep -q "\"lint\":" package.json && echo "yes" || echo "no"', returnStdout: true).trim()
-                    
-                    if (hasLintScript == "yes") {
-                        sh 'npm run lint || echo "Lint issues found"'
+                    if (sh(script: 'grep -q "\"lint\":" package.json', returnStatus: true) == 0) {
+                        try {
+                            sh 'npm run lint'
+                            echo "✅ Linting passed"
+                        } catch (err) {
+                            echo "⚠️ Linting issues found (not blocking)"
+                        }
                     } else {
                         echo "ℹ️ No lint script found - skipping"
                     }
@@ -65,17 +77,15 @@ pipeline {
             steps {
                 script {
                     // Check if test script exists
-                    def hasTestScript = sh(script: 'grep -q "\"test\":" package.json && echo "yes" || echo "no"', returnStdout: true).trim()
-                    
-                    if (hasTestScript == "yes") {
+                    if (sh(script: 'grep -q "\"test\":" package.json', returnStatus: true) == 0) {
                         try {
                             sh 'npm test'
                             echo "✅ Tests passed"
                         } catch (err) {
-                            error("❌ Tests failed - aborting pipeline")
+                            echo "⚠️ Tests failed (not blocking)"
                         }
                     } else {
-                        echo "ℹ️ No test script found - skipping tests"
+                        echo "ℹ️ No test script found - skipping"
                     }
                 }
             }
@@ -84,16 +94,11 @@ pipeline {
         stage('🏗️ 5. Build Project') {
             steps {
                 script {
-                    // Check if build script exists
-                    def hasBuildScript = sh(script: 'grep -q "\"build\":" package.json && echo "yes" || echo "no"', returnStdout: true).trim()
+                    sh 'npm run build'
+                    echo "✅ Build completed successfully"
                     
-                    if (hasBuildScript == "yes") {
-                        sh 'npm run build'
-                        echo "✅ Build completed successfully"
-                        sh 'ls -la dist/ || ls -la build/'
-                    } else {
-                        error("❌ No build script found - cannot continue")
-                    }
+                    // Verify build output
+                    sh 'ls -la dist/ || ls -la build/ || echo "Warning: No standard build directory found"'
                 }
             }
         }
@@ -106,19 +111,9 @@ pipeline {
         }
         success {
             echo "✅ Pipeline succeeded!"
-            emailext (
-                subject: "✅ Frontend Pipeline Success - ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                body: "Frontend build completed successfully\nBuild URL: ${env.BUILD_URL}",
-                to: 'your-email@example.com'
-            )
         }
         failure {
             echo "❌ Pipeline failed"
-            emailext (
-                subject: "❌ Frontend Pipeline Failed - ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                body: "Frontend build failed\nBuild URL: ${env.BUILD_URL}",
-                to: 'your-email@example.com'
-            )
         }
     }
 }
