@@ -37,10 +37,6 @@
     "vite": "^6.3.1"
   },
   
-  "scripts": {
-    "build": "your-build-command",
-    "lint": "eslint .",
-    "test": "echo \"No tests configured\" && exit 0"
-  }
+
 }
 
