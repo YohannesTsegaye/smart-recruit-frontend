@@ -35,5 +35,12 @@
     "globals": "^16.0.0",
     "react-router-dom": "^6.30.0",
     "vite": "^6.3.1"
+  },
+    "scripts": {
+    "build": "your-build-command",
+    "lint": "eslint .",
+    "test": "echo \"No tests configured\" && exit 0"
   }
+
 }
+
