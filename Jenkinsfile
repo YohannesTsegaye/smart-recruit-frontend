@@ -4,6 +4,8 @@ pipeline {
     environment {
         NODE_ENV = 'production'
         VITE_API_URL = 'http://localhost:3000'
+        // Ensure npm uses the correct registry
+        NPM_CONFIG_REGISTRY = 'https://registry.npmjs.org'
     }
 
     stages {
@@ -19,25 +21,43 @@ pipeline {
                     ]]
                 ])
                 echo "✅ Repository cloned successfully"
+                
+                // Verify Node.js and npm versions
+                sh 'node --version'
+                sh 'npm --version'
             }
         }
 
         stage('📦 2. Install Dependencies') {
             steps {
                 script {
-                    sh 'rm -rf node_modules'
+                    sh 'rm -rf node_modules package-lock.json'
                     
-                    // Install all dependencies including devDependencies
-                    sh 'npm install'
-                    echo "✅ All dependencies installed"
-                    
-                    // Verify critical tools are installed
-                    def eslintInstalled = sh(script: 'npm list eslint', returnStatus: true) == 0
-                    def viteInstalled = sh(script: 'npm list vite', returnStatus: true) == 0
-                    
-                    if (!eslintInstalled || !viteInstalled) {
-                        error("❌ Critical dependencies missing - eslint: ${eslintInstalled}, vite: ${viteInstalled}")
+                    // First attempt with clean install
+                    try {
+                        sh 'npm clean-install'  // Uses package-lock.json strictly
+                        echo "✅ Dependencies installed via npm clean-install"
+                    } catch (err) {
+                        echo "⚠️ clean-install failed, trying regular install"
+                        sh 'npm install --include=dev'  // Explicitly include devDependencies
                     }
+                    
+                    // Verify critical dependencies
+                    def verifyDependency = { dep ->
+                        return sh(script: "npm list ${dep} --depth=0", returnStatus: true) == 0
+                    }
+                    
+                    if (!verifyDependency('eslint') || !verifyDependency('vite')) {
+                        // Final fallback - install missing packages explicitly
+                        sh 'npm install eslint vite --save-dev'
+                        
+                        // Re-verify
+                        if (!verifyDependency('eslint') || !verifyDependency('vite')) {
+                            error("❌ Critical dependencies missing after installation attempts")
+                        }
+                    }
+                    
+                    echo "✅ Verified all required dependencies"
                 }
             }
         }
@@ -86,6 +106,7 @@ pipeline {
     post {
         always {
             echo "🎉 Pipeline execution completed"
+            archiveArtifacts artifacts: 'dist/**/*', allowEmptyArchive: true
             cleanWs()
         }
         success {
