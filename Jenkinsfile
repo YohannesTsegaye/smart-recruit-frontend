@@ -19,9 +19,6 @@ pipeline {
                     ]]
                 ])
                 echo "✅ Repository cloned successfully"
-                
-                // SOLUTION 3: Verify ESLint is available
-                sh 'npx eslint --version || echo "ESLint not found locally"'
             }
         }
 
@@ -30,14 +27,16 @@ pipeline {
                 script {
                     sh 'rm -rf node_modules'
                     
-                    // SOLUTION 1: Install ALL dependencies (including devDependencies)
-                    sh 'npm install' // Removed --omit=dev flag
-                    echo "✅ All dependencies installed (including devDependencies)"
+                    // Install all dependencies including devDependencies
+                    sh 'npm install'
+                    echo "✅ All dependencies installed"
                     
-                    // Verify build script exists
-                    if (!fileExists('package.json') || 
-                        !sh(script: 'grep -q "\"build\":" package.json', returnStatus: true) == 0) {
-                        error("❌ Critical: No build script found in package.json")
+                    // Verify critical tools are installed
+                    def eslintInstalled = sh(script: 'npm list eslint', returnStatus: true) == 0
+                    def viteInstalled = sh(script: 'npm list vite', returnStatus: true) == 0
+                    
+                    if (!eslintInstalled || !viteInstalled) {
+                        error("❌ Critical dependencies missing - eslint: ${eslintInstalled}, vite: ${viteInstalled}")
                     }
                 }
             }
@@ -46,16 +45,11 @@ pipeline {
         stage('🧹 3. Lint Code') {
             steps {
                 script {
-                    // Check if lint script exists
-                    if (sh(script: 'grep -q "\"lint\":" package.json', returnStatus: true) == 0) {
-                        try {
-                            sh 'npm run lint'
-                            echo "✅ Linting passed"
-                        } catch (err) {
-                            echo "⚠️ Linting issues found (not blocking)"
-                        }
-                    } else {
-                        echo "ℹ️ No lint script found - skipping"
+                    try {
+                        sh 'npx eslint .'
+                        echo "✅ Linting passed"
+                    } catch (err) {
+                        echo "⚠️ Linting issues found (not blocking)"
                     }
                 }
             }
@@ -64,7 +58,6 @@ pipeline {
         stage('🧪 4. Run Tests') {
             steps {
                 script {
-                    // Check if test script exists
                     if (sh(script: 'grep -q "\"test\":" package.json', returnStatus: true) == 0) {
                         try {
                             sh 'npm test'
@@ -82,11 +75,9 @@ pipeline {
         stage('🏗️ 5. Build Project') {
             steps {
                 script {
-                    sh 'npm run build'
+                    sh 'npx vite build'
                     echo "✅ Build completed successfully"
-                    
-                    // Verify build output
-                    sh 'ls -la dist/ || ls -la build/ || echo "Warning: No standard build directory found"'
+                    sh 'ls -la dist/'
                 }
             }
         }
@@ -105,5 +96,3 @@ pipeline {
         }
     }
 }
-
-
