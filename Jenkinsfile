@@ -5,6 +5,8 @@ pipeline {
         NODE_ENV = 'production'
         VITE_API_URL = 'http://localhost:3000'
         NPM_CONFIG_REGISTRY = 'https://registry.npmjs.org'
+        // Ensure Node.js uses correct module resolution
+        NODE_OPTIONS = "--experimental-vm-modules --no-warnings"
     }
 
     stages {
@@ -16,8 +18,8 @@ pipeline {
                     def nodeVersion = sh(script: 'node --version', returnStdout: true).trim()
                     def npmVersion = sh(script: 'npm --version', returnStdout: true).trim()
                     echo "ℹ️ Using Node.js ${nodeVersion} and npm ${npmVersion}"
-
-                    // Checkout code from main branch
+                    
+                    // Checkout code
                     checkout([
                         $class: 'GitSCM',
                         branches: [[name: '*/main']],
@@ -27,58 +29,72 @@ pipeline {
                         ]]
                     ])
                     echo "✅ Repository cloned successfully"
+                    
+                    // Verify package.json exists
+                    if (!fileExists('package.json')) {
+                        error("❌ package.json not found")
+                    }
                 }
             }
         }
 
-        stage('📦 2. Dependency Installation') {
+        stage('📦 2. Complete Dependency Installation') {
             steps {
                 script {
-                    // Remove node_modules but keep package-lock.json if present
-                    sh 'rm -rf node_modules'
-
-                    // Create package-lock.json if missing
-                    if (!fileExists('package-lock.json')) {
-                        echo "ℹ️ No package-lock.json found, generating..."
-                        sh 'npm install --package-lock-only --no-audit'
+                    // Clean previous installation
+                    sh 'rm -rf node_modules package-lock.json .npmrc'
+                    
+                    // Full installation with all dependencies
+                    sh 'npm install --legacy-peer-deps --no-audit --prefer-offline --fetch-timeout=300000'
+                    echo "✅ Dependencies installed"
+                    
+                    // Reinstall core dependencies to ensure proper linking
+                    sh 'npm install eslint vite @eslint/js --no-audit --prefer-offline --save-exact'
+                    
+                    // Verify critical dependencies are properly installed
+                    def verifyDep = { dep ->
+                        def status = sh(
+                            script: "npm list ${dep} --depth=0 --json | grep -q '\"version\":'",
+                            returnStatus: true
+                        )
+                        return status == 0
                     }
-
-                    // Try clean install first
-                    try {
-                        sh 'npm ci --no-audit'
-                        echo "✅ Dependencies installed via npm ci"
-                    } catch (ciErr) {
-                        echo "⚠️ npm ci failed, falling back to npm install"
-                        sh 'npm install --no-audit --include=dev'
+                    
+                    if (!verifyDep('eslint') || !verifyDep('vite') || !verifyDep('@eslint/js')) {
+                        error("❌ Critical dependencies could not be installed")
                     }
-
-                    // Ensure critical dev dependencies
-                    def depsToEnsure = ['eslint', 'vite']
-                    depsToEnsure.each { dep ->
-                        if (sh(script: "npm list ${dep} --depth=0 --parseable", returnStatus: true) != 0) {
-                            echo "ℹ️ Installing missing dependency: ${dep}"
-                            sh "npm install ${dep} --save-dev --no-audit"
-                        }
-                    }
-
-                    // Final verification
-                    depsToEnsure.each { dep ->
-                        if (sh(script: "npm list ${dep} --depth=0 --parseable", returnStatus: true) != 0) {
-                            error("❌ Critical dependency missing: ${dep}")
-                        }
-                    }
-
-                    echo "✅ Verified all critical dependencies"
+                    
+                    echo "✅ Verified all core dependencies"
                 }
             }
         }
 
-        stage('🧹 3. Linting') {
+        stage('🔧 3. Dependency Linking') {
+            steps {
+                script {
+                    // Rebuild dependencies to ensure proper linking
+                    sh 'npm rebuild'
+                    
+                    // Create explicit symlinks if needed
+                    sh '''
+                        if [ ! -f node_modules/.bin/eslint ]; then
+                            ln -s ../eslint/bin/eslint.js node_modules/.bin/eslint
+                        fi
+                        if [ ! -f node_modules/.bin/vite ]; then
+                            ln -s ../vite/bin/vite.js node_modules/.bin/vite
+                        fi
+                    '''
+                    echo "✅ Dependencies properly linked"
+                }
+            }
+        }
+
+        stage('🧹 4. Linting') {
             steps {
                 script {
                     try {
-                        sh 'npx eslint --version'
-                        sh 'npx eslint . --max-warnings=0'
+                        // Use direct path to eslint to avoid resolution issues
+                        sh 'node node_modules/eslint/bin/eslint.js . --max-warnings=0'
                         echo "✅ Linting passed with no warnings"
                     } catch (err) {
                         echo "⚠️ Linting issues found (build continues)"
@@ -87,18 +103,21 @@ pipeline {
             }
         }
 
-        stage('🏗️ 4. Building') {
+        stage('🏗️ 5. Building') {
             steps {
                 script {
-                    sh 'npx vite --version'
-                    sh 'npx vite build --emptyOutDir'
+                    // Use direct path to vite to avoid resolution issues
+                    sh 'node node_modules/vite/bin/vite.js build --emptyOutDir'
                     echo "✅ Build completed successfully"
-
+                    
                     // Verify build output
-                    def buildDir = fileExists('dist') ? 'dist' : 'build'
-                    sh "ls -la ${buildDir}/"
-                    echo "📦 Build output size:"
-                    sh "du -sh ${buildDir}/"
+                    if (!fileExists('dist/index.html') && !fileExists('build/index.html')) {
+                        error("❌ No build output detected")
+                    }
+                    
+                    echo "📦 Build output:"
+                    sh 'ls -la dist/ || ls -la build/'
+                    sh 'du -sh dist/ || du -sh build/'
                 }
             }
         }
@@ -106,7 +125,7 @@ pipeline {
 
     post {
         always {
-            archiveArtifacts artifacts: 'dist/**/*', allowEmptyArchive: true
+            archiveArtifacts artifacts: 'dist/**/*,build/**/*', allowEmptyArchive: true
             cleanWs()
         }
         success {
