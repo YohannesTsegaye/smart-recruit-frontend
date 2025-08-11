@@ -5,7 +5,6 @@ pipeline {
         NODE_ENV = 'production'
         VITE_API_URL = 'http://localhost:3000'
         NPM_CONFIG_REGISTRY = 'https://registry.npmjs.org'
-        // Ensure Node.js uses correct module resolution
         NODE_OPTIONS = "--experimental-vm-modules --no-warnings"
     }
 
@@ -38,20 +37,27 @@ pipeline {
             }
         }
 
-        stage('📦 2. Complete Dependency Installation') {
+        stage('📦 2. Robust Dependency Installation') {
             steps {
                 script {
                     // Clean previous installation
                     sh 'rm -rf node_modules package-lock.json .npmrc'
                     
-                    // Full installation with all dependencies
-                    sh 'npm install --legacy-peer-deps --no-audit --prefer-offline --fetch-timeout=300000'
-                    echo "✅ Dependencies installed"
+                    // Strategy 1: Try npm ci with devDependencies
+                    try {
+                        sh 'NODE_ENV= npm ci --include=dev --no-audit'
+                        echo "✅ Dependencies installed via npm ci"
+                    } catch (ciErr) {
+                        echo "⚠️ npm ci failed, falling back to npm install"
+                        
+                        // Strategy 2: Full npm install with legacy peer deps
+                        sh 'npm install --legacy-peer-deps --no-audit --prefer-offline --fetch-timeout=300000'
+                    }
                     
-                    // Reinstall core dependencies to ensure proper linking
+                    // Strategy 3: Ensure core dependencies are present
                     sh 'npm install eslint vite @eslint/js --no-audit --prefer-offline --save-exact'
                     
-                    // Verify critical dependencies are properly installed
+                    // Verify critical dependencies
                     def verifyDep = { dep ->
                         def status = sh(
                             script: "npm list ${dep} --depth=0 --json | grep -q '\"version\":'",
@@ -72,17 +78,11 @@ pipeline {
         stage('🔧 3. Dependency Linking') {
             steps {
                 script {
-                    // Rebuild dependencies to ensure proper linking
+                    // Rebuild and link dependencies
                     sh 'npm rebuild'
-                    
-                    // Create explicit symlinks if needed
                     sh '''
-                        if [ ! -f node_modules/.bin/eslint ]; then
-                            ln -s ../eslint/bin/eslint.js node_modules/.bin/eslint
-                        fi
-                        if [ ! -f node_modules/.bin/vite ]; then
-                            ln -s ../vite/bin/vite.js node_modules/.bin/vite
-                        fi
+                        [ ! -f node_modules/.bin/eslint ] && ln -s ../eslint/bin/eslint.js node_modules/.bin/eslint || true
+                        [ ! -f node_modules/.bin/vite ] && ln -s ../vite/bin/vite.js node_modules/.bin/vite || true
                     '''
                     echo "✅ Dependencies properly linked"
                 }
@@ -93,11 +93,10 @@ pipeline {
             steps {
                 script {
                     try {
-                        // Use direct path to eslint to avoid resolution issues
                         sh 'node node_modules/eslint/bin/eslint.js . --max-warnings=0'
                         echo "✅ Linting passed with no warnings"
                     } catch (err) {
-                        echo "⚠️ Linting issues found (build continues)"
+                        echo "⚠️ Linting issues found (not blocking)"
                     }
                 }
             }
@@ -106,7 +105,6 @@ pipeline {
         stage('🏗️ 5. Building') {
             steps {
                 script {
-                    // Use direct path to vite to avoid resolution issues
                     sh 'node node_modules/vite/bin/vite.js build --emptyOutDir'
                     echo "✅ Build completed successfully"
                     
