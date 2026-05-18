@@ -1,12 +1,12 @@
 // import React, { useState, useEffect } from 'react';
-// import TitleIcon from '../../assets/icons/TitleIcon';
-// import CompanyIcon from '../../assets/icons/CompanyIcon';
-// import LocationIcon from '../../assets/icons/LocationIcon';
-// import EmploymentIcon from '../../assets/icons/EmploymentIcon';
-// import JobTypeIcon from '../../assets/icons/JobTypeIcon';
-// import SalaryIcon from '../../assets/icons/SalaryIcon';
-// import DescriptionIcon from '../../assets/icons/DescriptionIcon';
-// import RequirementsIcon from '../../assets/icons/RequirementsIcon';
+// import TitleIcon from '../../assets/Icons/TitleIcon';
+// import CompanyIcon from '../../assets/Icons/CompanyIcon';
+// import LocationIcon from '../../assets/Icons/LocationIcon';
+// import EmploymentIcon from '../../assets/Icons/EmploymentIcon';
+// import JobTypeIcon from '../../assets/Icons/JobTypeIcon';
+// import SalaryIcon from '../../assets/Icons/SalaryIcon';
+// import DescriptionIcon from '../../assets/Icons/DescriptionIcon';
+// import RequirementsIcon from '../../assets/Icons/RequirementsIcon';
 // import FileUpload from './FileUpload';
 
 // export default function Job() {

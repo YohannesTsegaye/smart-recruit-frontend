@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import UploadIcon from "../../assets/icons/UploadIcon";
+import UploadIcon from "../../assets/Icons/UploadIcon";
 import { XCircle } from "lucide-react";
 import { CandidatesService } from "../../services/candidates.service";
 

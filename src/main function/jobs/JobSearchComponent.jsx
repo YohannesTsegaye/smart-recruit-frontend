@@ -1,7 +1,7 @@
 // import React, { useState, useEffect } from 'react';
 // import JobApplicationForm from './JobApplicationForm';
 import React, { useState, useEffect } from "react";
-import SearchIcon from "../../assets/icons/SearchIcon";
+import SearchIcon from "../../assets/Icons/SearchIcon";
 
 const JobSearchComponent = ({
   searchTerm,
